@@ -6,8 +6,6 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.common import TimeoutException
-from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
@@ -16,12 +14,11 @@ BASE_URL = "https://webscraper.io/"
 HOME_URL = urljoin(BASE_URL, "test-sites/e-commerce/more/")
 
 ALL_URLS = {
-    "home": HOME_URL,
-    "computers": HOME_URL + "computers",
-    "laptops": HOME_URL + "computers/laptops",
-    "tablets": HOME_URL + "computers/tablets",
-    "phones": HOME_URL + "phones",
-    "touch": HOME_URL + "phones/touch"
+    "computers": urljoin(HOME_URL, "computers"),
+    "laptops": urljoin(HOME_URL, "computers/laptops"),
+    "tablets": urljoin(HOME_URL, "computers/tablets"),
+    "phones": urljoin(HOME_URL, "phones"),
+    "touch": urljoin(HOME_URL, "phones/touch")
 }
 
 
@@ -45,35 +42,6 @@ def parse_single_product(product_soup):
         rating=len(product_soup.select(".ratings span")),
         num_of_reviews=int(product_soup.select_one(".ratings > p").text.split()[0])
     )
-
-
-def click_btn(driver: webdriver, btn_text: str) -> None:
-    link = WebDriverWait(driver, 2).until(
-        ec.element_to_be_clickable(
-            (By.XPATH, f"//a[contains(text(), '{btn_text}')]")
-        )
-    )
-    driver.execute_script("arguments[0].scrollIntoView(true);", link)
-    action = ActionChains(driver)
-    action.move_to_element(link).click().perform()
-
-
-def parse_page(url: str, driver) -> list[Product]:
-    driver.get(url)
-
-    while True:
-        try:
-            click_btn(driver=driver, btn_text="More")
-        except TimeoutException:
-            break
-
-    soup = BeautifulSoup(driver.page_source, "html.parser")
-
-    products = soup.select(".thumbnail")
-    return [
-        parse_single_product(product)
-        for product in products
-    ]
 
 
 def write_products_to_csv(products, file_name):
@@ -105,6 +73,13 @@ def handle_show_more(driver: webdriver.Chrome) -> None:
             break
 
 
+def parse_products_from_soup(soup):
+    products = []
+    for product in soup.select(".thumbnail"):
+        products.append(parse_single_product(product))
+    return products
+
+
 def get_all_products() -> None:
     with webdriver.Chrome() as driver:
         for name, link in ALL_URLS.items():
@@ -112,8 +87,7 @@ def get_all_products() -> None:
             handle_cookies(driver)
             handle_show_more(driver)
             soup = BeautifulSoup(driver.page_source, "html.parser")
-            products = [parse_single_product(product)
-                        for product in soup.select(".thumbnail")]
+            products = parse_products_from_soup(soup=soup)
             write_products_to_csv(products, f"{name}.csv")
         driver.quit()
 
