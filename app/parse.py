@@ -73,20 +73,24 @@ def handle_show_more(driver: webdriver.Chrome) -> None:
             break
 
 
-def parse_products_from_soup(soup):
+def parse_products_from_soup(soup: BeautifulSoup) -> list:
     products = []
     for product in soup.select(".thumbnail"):
         products.append(parse_single_product(product))
     return products
 
 
+def get_page_soup(driver:webdriver.Chrome, url: str) -> BeautifulSoup:
+    driver.get(url)
+    handle_cookies(driver)
+    handle_show_more(driver)
+    return BeautifulSoup(driver.page_source, "html.parser")
+
+
 def get_all_products() -> None:
     with webdriver.Chrome() as driver:
         for name, link in ALL_URLS.items():
-            driver.get(urljoin(BASE_URL, link))
-            handle_cookies(driver)
-            handle_show_more(driver)
-            soup = BeautifulSoup(driver.page_source, "html.parser")
+            soup = get_page_soup(driver, link)
             products = parse_products_from_soup(soup=soup)
             write_products_to_csv(products, f"{name}.csv")
         driver.quit()
